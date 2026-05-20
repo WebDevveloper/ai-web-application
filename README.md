@@ -1,16 +1,137 @@
-# React + Vite
+# AI Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A small fullstack chat application built with React, Vite, Tailwind CSS, Node.js and Express.
 
-Currently, two official plugins are available:
+The application allows the user to:
+- have a continuous chat with an AI assistant;
+- send messages through the backend to the Mistral API;
+- use voice input if the browser supports Web Speech API;
+- send messages with Enter and add a new line with Shift + Enter;
+- see a loading indicator while the answer is being generated.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The API key is used only on the backend and is not exposed in the browser.
 
-## React Compiler
+## Tech stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Frontend
+- React
+- Vite
+- Tailwind CSS
+- JavaScript
 
-## Expanding the ESLint configuration
+### Backend
+- Node.js
+- Express
+- Mistral AI API
+- dotenv
+- cors
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Project structure
+
+```txt
+ai-web-application-mistral-chat/
+  client/
+    src/
+      api/
+        chatApi.js
+      components/
+        ChatComposer.jsx
+        ChatMessage.jsx
+        LoadingBubble.jsx
+      App.jsx
+      index.css
+      main.jsx
+    package.json
+    vite.config.js
+
+  server/
+    src/
+      index.js
+    .env.example
+    package.json
+```
+
+## How to run locally
+
+### 1. Install frontend dependencies
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+By default, the frontend runs on:
+
+```txt
+http://localhost:5173
+```
+
+### 2. Install backend dependencies
+
+Open another terminal:
+
+```bash
+cd server
+npm install
+npm run dev
+```
+
+By default, the backend runs on:
+
+```txt
+http://localhost:3000
+```
+
+### 3. Configure environment variables
+
+Create a `.env` file inside the `server` folder based on `.env.example`.
+
+```env
+PORT=3000
+CLIENT_ORIGIN=http://localhost:5173
+MISTRAL_API_KEY=your_api_key_here
+MISTRAL_MODEL=mistral-small-latest
+```
+
+## API endpoints
+
+### Health check
+
+```http
+GET /api/health
+```
+
+### Send chat history to the AI assistant
+
+```http
+POST /api/chat
+```
+
+Request body:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello!"
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "answer": "Hello! How can I help you?"
+}
+```
+
+## Notes
+
+- The Mistral API key must be stored only in `server/.env`.
+- Do not commit `.env` to GitHub.
+- Voice input depends on browser support.
+- The chat is stored in React state for the current session.
