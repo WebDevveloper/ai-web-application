@@ -131,7 +131,5 @@ Response:
 
 ## Notes
 
-- The Mistral API key must be stored only in `server/.env`.
-- Do not commit `.env` to GitHub.
 - Voice input depends on browser support.
 - The chat is stored in React state for the current session.
