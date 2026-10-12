@@ -1,135 +1,165 @@
-# AI Web Application
+# Политех Навигатор
 
-A small fullstack chat application built with React, Vite, Tailwind CSS, Node.js and Express.
+MVP ИИ-ассистента для первокурсника: расписание и дедлайны, навигация по кампусу, поиск ответственного подразделения и ответы по проверенным материалам.
 
-The application allows the user to:
-- have a continuous chat with an AI assistant;
-- send messages through the backend to the Mistral API;
-- use voice input if the browser supports Web Speech API;
-- send messages with Enter and add a new line with Shift + Enter;
-- see a loading indicator while the answer is being generated.
+Проект не отправляет модели все документы при каждом вопросе. Сначала сервер определяет сценарий и обращается к PostgreSQL. Для справочных вопросов он находит несколько подходящих фрагментов, а затем передаёт модели только их вместе с закрытой инструкцией отвечать по источникам.
 
-The API key is used only on the backend and is not exposed in the browser.
+> Начальные записи помечены `[ДЕМО]`. Они нужны для проверки интерфейса и не являются официальными сведениями университета.
 
-## Tech stack
+## Что входит в MVP
 
-### Frontend
-- React
-- Vite
-- Tailwind CSS
-- JavaScript
+- адаптивный интерфейс без типового «чата с градиентом»;
+- домашняя сводка для выбранной группы;
+- отдельные сценарии расписания, дедлайнов, мест и контактов;
+- поиск по русскоязычным материалам PostgreSQL Full Text Search;
+- ответ Mistral только при наличии найденного проверенного источника;
+- карточки источников и дата их проверки;
+- оценка полезности ответа;
+- импорт `.md` и `.txt` документов через серверную команду;
+- миграция, безопасно повторяемые демоданные и автоматические тесты.
 
-### Backend
-- Node.js
-- Express
-- Mistral AI API
-- dotenv
-- cors
+Подробные продуктовые требования и архитектура находятся в [docs/MVP_SPEC.md](docs/MVP_SPEC.md), план проверки — в [docs/TESTING.md](docs/TESTING.md).
 
-## Project structure
+## Структура
 
-```txt
-ai-web-application-mistral-chat/
-  client/
-    src/
-      api/
-        chatApi.js
-      components/
-        ChatComposer.jsx
-        ChatMessage.jsx
-        LoadingBubble.jsx
-      App.jsx
-      index.css
-      main.jsx
-    package.json
-    vite.config.js
-
-  server/
-    src/
-      index.js
-    .env.example
-    package.json
+```text
+src/                       React-интерфейс
+server/
+  db/migrations/           схема PostgreSQL
+  db/seed.sql              только демонстрационные записи
+  src/repositories/        SQL-запросы к данным кампуса
+  src/services/            сценарии ответов, поиск и Mistral
+  src/routes/              HTTP API
+  test/                    модульные тесты backend
+docs/                      требования, архитектура и валидация
 ```
 
-## How to run locally
+## Локальный запуск
 
-### 1. Install frontend dependencies
+### 1. PostgreSQL
+
+Если установлен Docker:
 
 ```bash
-cd client
-npm install
-npm run dev
+docker compose up -d postgres
 ```
 
-By default, the frontend runs on:
+Или используйте существующий PostgreSQL и укажите его URL в `server/.env`.
 
-```txt
-http://localhost:5173
-```
-
-### 2. Install backend dependencies
-
-Open another terminal:
+### 2. Backend
 
 ```bash
 cd server
 npm install
+cp .env.example .env
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
-By default, the backend runs on:
+В `server/.env` нужно заменить `MISTRAL_API_KEY`. Ключ хранится только на сервере и никогда не должен иметь префикс `VITE_`.
 
-```txt
-http://localhost:3000
+Backend будет доступен на `http://localhost:3000`.
+
+### 3. Frontend
+
+В другом терминале из корня проекта:
+
+```bash
+npm install
+cp .env.example .env
+npm run dev
 ```
 
-### 3. Configure environment variables
+Frontend будет доступен на `http://localhost:5173`.
 
-Create a `.env` file inside the `server` folder based on `.env.example`.
+## Импорт материалов
 
-```env
-PORT=3000
-CLIENT_ORIGIN=http://localhost:5173
-MISTRAL_API_KEY=your_api_key_here
-MISTRAL_MODEL=mistral-small-latest
+Сначала приведите официальный документ к Markdown или обычному тексту. Источник без флага `--verified` импортируется как черновик и не используется в ответах.
+
+```bash
+cd server
+npm run data:import -- \
+  --file ./data/student-guide.md \
+  --key student-guide-2026 \
+  --title "Памятка первокурсника" \
+  --url "https://example.edu/student-guide" \
+  --owner "Учебный офис"
 ```
 
-## API endpoints
+После проверки содержимого ответственным сотрудником повторите импорт с флагом `--verified`. Команда обновит существующий источник с тем же `--key` и заново создаст его фрагменты.
 
-### Health check
-
-```http
-GET /api/health
+```bash
+npm run data:import -- \
+  --file ./data/student-guide.md \
+  --key student-guide-2026 \
+  --title "Памятка первокурсника" \
+  --url "https://example.edu/student-guide" \
+  --owner "Учебный офис" \
+  --verified
 ```
 
-### Send chat history to the AI assistant
+PDF и DOCX в первой версии намеренно не разбираются автоматически: их качество и структура сильно различаются. Их можно конвертировать в Markdown после ручной проверки, а OCR/парсеры добавить после проверки реального набора документов.
 
-```http
-POST /api/chat
+## Проверки
+
+Из корня проекта:
+
+```bash
+npm run check
 ```
 
-Request body:
+Команда запускает ESLint, backend-тесты и production-сборку Vite.
+
+## API
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| `GET` | `/api/health` | состояние API и подключения к PostgreSQL |
+| `GET` | `/api/dashboard?groupCode=261-321` | занятия, сроки и места для главной страницы |
+| `POST` | `/api/chat` | ответ по структурированным данным или найденным источникам |
+| `POST` | `/api/feedback` | оценка полезности ответа |
+
+Пример запроса:
 
 ```json
 {
   "messages": [
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ]
+    { "role": "user", "content": "Какие пары у меня завтра?" }
+  ],
+  "context": { "groupCode": "261-321" }
 }
 ```
 
-Response:
+## Развёртывание
 
-```json
-{
-  "answer": "Hello! How can I help you?"
-}
+### Railway: backend и PostgreSQL
+
+1. Создайте PostgreSQL-сервис и Node.js-сервис из этого репозитория.
+2. Для Node.js-сервиса задайте Root Directory: `/server`.
+3. Передайте backend переменные из `server/.env.example`. `DATABASE_URL` должен ссылаться на созданный PostgreSQL.
+4. Выполните `npm run db:migrate`. `npm run db:seed` запускайте только для демонстрации.
+5. Укажите Healthcheck Path: `/api/health`.
+6. После появления адреса frontend добавьте его без завершающего `/` в `CLIENT_ORIGINS`.
+
+Railway определяет `npm start` из `server/package.json`; отдельный Dockerfile для MVP не требуется.
+
+### Netlify: frontend
+
+Файл `netlify.toml` уже задаёт `npm run build` и каталог `dist` — рекомендуемые значения для Vite. В настройках Netlify добавьте:
+
+```text
+VITE_API_URL=https://адрес-backend-на-railway
+VITE_DEFAULT_GROUP_CODE=261-321
 ```
 
-## Notes
+`VITE_API_URL` является публичным адресом API, а не секретом. Ключ Mistral и `DATABASE_URL` должны оставаться только в Railway.
 
-- Voice input depends on browser support.
-- The chat is stored in React state for the current session.
+## Ограничения первой версии
+
+- вход через университетскую учётную запись пока не реализован;
+- история диалогов хранится только в браузере;
+- расписание и дедлайны загружаются в БД вручную или будущим интеграционным скриптом;
+- нет автоматической отправки обращений от имени студента;
+- полнотекстовый поиск выбран как простая измеримая база; векторный поиск стоит добавлять только если тесты покажут низкую релевантность;
+- официальные данные и разрешение на их использование должен предоставить владелец соответствующего процесса.

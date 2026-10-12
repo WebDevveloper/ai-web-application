@@ -1,112 +1,35 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+import { createApp } from "./src/app.js";
+import { config } from "./src/config.js";
+import { createDatabase } from "./src/db/pool.js";
+import { createCampusRepository } from "./src/repositories/campusRepository.js";
+import { createAssistantService } from "./src/services/assistantService.js";
+import { createMistralClient } from "./src/services/mistralClient.js";
 
-dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 3000;
-const mistralApiUrl = "https://api.mistral.ai/v1/chat/completions";
-
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
-  })
-);
-
-app.use(express.json({ limit: "1mb" }));
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+const database = createDatabase(config.database);
+const campusRepository = createCampusRepository(database, {
+  timeZone: config.campusTimeZone,
+});
+const mistralClient = createMistralClient(config.mistral);
+const assistantService = createAssistantService({
+  campusRepository,
+  mistralClient,
+  timeZone: config.campusTimeZone,
 });
 
-function normalizeMessages(body) {
-  if (Array.isArray(body.messages)) {
-    return body.messages
-      .filter(
-        (message) =>
-          (message.role === "user" || message.role === "assistant") &&
-          typeof message.content === "string" &&
-          message.content.trim()
-      )
-      .map((message) => ({
-        role: message.role,
-        content: message.content.trim(),
-      }));
-  }
+const app = createApp({ assistantService, campusRepository, config });
 
-  if (typeof body.message === "string" && body.message.trim()) {
-    return [
-      {
-        role: "user",
-        content: body.message.trim(),
-      },
-    ];
-  }
+const server = app.listen(config.port, config.host, () => {
+  console.log(`Campus API started on http://${config.host}:${config.port}`);
+});
 
-  return [];
+async function shutdown(signal) {
+  console.log(`${signal}: stopping Campus API`);
+
+  server.close(async () => {
+    await database.close();
+    process.exit(0);
+  });
 }
 
-app.post("/api/chat", async (req, res) => {
-  const messages = normalizeMessages(req.body);
-
-  if (messages.length === 0) {
-    return res.status(400).json({ error: "Message is required." });
-  }
-
-  if (!process.env.MISTRAL_API_KEY) {
-    return res.status(500).json({
-      error: "Mistral API key is not configured.",
-    });
-  }
-
-  try {
-    const mistralResponse = await fetch(mistralApiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.MISTRAL_MODEL || "mistral-small-latest",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a helpful assistant. Give clear and practical answers.",
-          },
-          ...messages,
-        ],
-      }),
-    });
-
-    const data = await mistralResponse.json().catch(() => null);
-
-    if (!mistralResponse.ok) {
-      console.error("Mistral API error:", data);
-
-      return res.status(mistralResponse.status).json({
-        error:
-          data?.message ||
-          data?.error?.message ||
-          "Mistral API returned an error.",
-      });
-    }
-
-    const answer = data?.choices?.[0]?.message?.content;
-
-    res.json({
-      answer: answer || "The AI service returned an empty response.",
-    });
-  } catch (error) {
-    console.error("AI request failed:", error);
-
-    res.status(500).json({
-      error: "Failed to get a response from the AI service.",
-    });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`Server started on http://localhost:${port}`);
-});
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

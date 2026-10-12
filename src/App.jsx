@@ -1,131 +1,207 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { askAssistant } from "./api/chatApi";
+import { getDashboard } from "./api/campusApi";
 import ChatComposer from "./components/ChatComposer";
 import ChatMessage from "./components/ChatMessage";
+import ContextDrawer from "./components/ContextDrawer";
 import EmptyState from "./components/EmptyState";
+import HomeDashboard from "./components/HomeDashboard";
 import LoadingBubble from "./components/LoadingBubble";
 import Sidebar from "./components/Sidebar";
+import TopBar from "./components/TopBar";
 
-const STORAGE_KEY = "ai-web-application-chats";
+const CHAT_STORAGE_KEY = "polytech-navigator-chats";
+const DEFAULT_GROUP_CODE = import.meta.env.VITE_DEFAULT_GROUP_CODE || "261-321";
 
 function createChat() {
   return {
     id: crypto.randomUUID(),
-    title: "New chat",
+    title: "Новый диалог",
     messages: [],
     updatedAt: Date.now(),
   };
 }
 
-function createMessage(role, content) {
+function createMessage(role, content, extra = {}) {
   return {
     id: crypto.randomUUID(),
     role,
     content,
+    ...extra,
   };
 }
 
 function getChatTitle(text) {
   const cleanText = text.replace(/\s+/g, " ").trim();
 
-  if (cleanText.length <= 34) {
-    return cleanText || "New chat";
+  if (cleanText.length <= 42) {
+    return cleanText || "Новый диалог";
   }
 
-  return `${cleanText.slice(0, 34)}...`;
+  return `${cleanText.slice(0, 42)}…`;
 }
 
-function loadInitialChats() {
+function loadChats() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const savedValue = localStorage.getItem(CHAT_STORAGE_KEY);
 
-    if (!saved) {
+    if (!savedValue) {
       const firstChat = createChat();
-      return {
-        chats: [firstChat],
-        activeChatId: firstChat.id,
-      };
+      return { chats: [firstChat], activeChatId: firstChat.id };
     }
 
-    const parsed = JSON.parse(saved);
+    const parsedValue = JSON.parse(savedValue);
 
-    if (!Array.isArray(parsed.chats) || parsed.chats.length === 0) {
-      throw new Error("Invalid chat history");
+    if (!Array.isArray(parsedValue.chats) || parsedValue.chats.length === 0) {
+      throw new Error("История диалогов повреждена");
     }
 
     return {
-      chats: parsed.chats,
-      activeChatId: parsed.activeChatId || parsed.chats[0].id,
+      chats: parsedValue.chats,
+      activeChatId: parsedValue.activeChatId || parsedValue.chats[0].id,
     };
   } catch {
     const firstChat = createChat();
-
-    return {
-      chats: [firstChat],
-      activeChatId: firstChat.id,
-    };
+    return { chats: [firstChat], activeChatId: firstChat.id };
   }
 }
 
-function App() {
-  const [initialState] = useState(() => loadInitialChats ());
-
-  const [chats, setChats] = useState(initialState.chats);
-  const [activeChatId, setActiveChatId] = useState(initialState.activeChatId);
+export default function App() {
+  const [initialChats] = useState(loadChats);
+  const [chats, setChats] = useState(initialChats.chats);
+  const [activeChatId, setActiveChatId] = useState(initialChats.activeChatId);
+  const [activeView, setActiveView] = useState("home");
   const [draft, setDraft] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-
-  const recognitionRef = useRef(null);
-  const shouldKeepListeningRef = useRef(false);
-  const voiceBaseTextRef = useRef("");
-  const draftRef = useRef("");
+  const [groupCode] = useState(DEFAULT_GROUP_CODE);
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardError, setDashboardError] = useState("");
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+  const [isAnswerLoading, setIsAnswerLoading] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const [drawerName, setDrawerName] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const chatEndRef = useRef(null);
 
-  const isVoiceSupported =
-    "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
-
-  const activeChat =
-    chats.find((chat) => chat.id === activeChatId) || chats[0];
+  const activeChat = useMemo(
+    () => chats.find((chat) => chat.id === activeChatId) || chats[0],
+    [activeChatId, chats],
+  );
+  const sourceStatus = isDashboardLoading
+    ? {
+        state: "loading",
+        title: "Проверяем источники",
+        details: "загружаем данные кампуса",
+      }
+    : dashboardError
+      ? {
+          state: "error",
+          title: "Источники недоступны",
+          details: "проверьте подключение сервера",
+        }
+      : {
+          state: "ready",
+          title: "Источники подключены",
+          details: "актуальность указана в ответах",
+        };
 
   useEffect(() => {
     localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        chats,
-        activeChatId,
-      })
+      CHAT_STORAGE_KEY,
+      JSON.stringify({ chats, activeChatId }),
     );
   }, [chats, activeChatId]);
 
   useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
+    let isCancelled = false;
+
+    async function loadDashboard() {
+      setIsDashboardLoading(true);
+      setDashboardError("");
+
+      try {
+        const data = await getDashboard(groupCode);
+
+        if (!isCancelled) {
+          setDashboard(data);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setDashboardError(
+            error.message || "Не удалось загрузить данные кампуса.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsDashboardLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [groupCode]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeChat?.messages, isLoading]);
+  }, [activeChat?.messages, isAnswerLoading]);
 
   function updateActiveChat(updater) {
     setChats((currentChats) =>
-      currentChats.map((chat) => {
-        if (chat.id !== activeChatId) {
-          return chat;
-        }
-
-        return updater(chat);
-      })
+      currentChats.map((chat) =>
+        chat.id === activeChatId ? updater(chat) : chat,
+      ),
     );
   }
 
-  async function sendMessage() {
-    const text = draft.trim();
+  function openView(viewName) {
+    setActiveView(viewName);
+    setIsMobileMenuOpen(false);
+  }
 
-    if (!text || isLoading || !activeChat) {
+  function startNewChat() {
+    const chat = createChat();
+    setChats((currentChats) => [chat, ...currentChats]);
+    setActiveChatId(chat.id);
+    setDraft("");
+    setChatError("");
+    openView("chat");
+  }
+
+  function selectChat(chatId) {
+    setActiveChatId(chatId);
+    setChatError("");
+    openView("chat");
+  }
+
+  function deleteChat(chatId) {
+    setChats((currentChats) => {
+      const remainingChats = currentChats.filter((chat) => chat.id !== chatId);
+
+      if (remainingChats.length === 0) {
+        const replacementChat = createChat();
+        setActiveChatId(replacementChat.id);
+        return [replacementChat];
+      }
+
+      if (chatId === activeChatId) {
+        setActiveChatId(remainingChats[0].id);
+      }
+
+      return remainingChats;
+    });
+  }
+
+  async function sendMessage(messageText = draft) {
+    const text = messageText.trim();
+
+    if (!text || isAnswerLoading || !activeChat) {
       return;
     }
 
+    const requestChatId = activeChat.id;
     const userMessage = createMessage("user", text);
     const nextMessages = [...activeChat.messages, userMessage];
 
@@ -137,241 +213,121 @@ function App() {
     }));
 
     setDraft("");
-    setError("");
-    setIsLoading(true);
+    setChatError("");
+    setIsAnswerLoading(true);
+    openView("chat");
 
     try {
       const apiMessages = nextMessages.map(({ role, content }) => ({
         role,
         content,
       }));
-
-      const answer = await askAssistant(apiMessages);
-      const assistantMessage = createMessage("assistant", answer);
+      const response = await askAssistant(apiMessages, { groupCode });
+      const assistantMessage = createMessage("assistant", response.answer, {
+        answerType: response.answerType,
+        sources: response.sources,
+        actions: response.actions,
+      });
 
       setChats((currentChats) =>
-        currentChats.map((chat) => {
-          if (chat.id !== activeChatId) {
-            return chat;
-          }
-
-          return {
-            ...chat,
-            messages: [...nextMessages, assistantMessage],
-            updatedAt: Date.now(),
-          };
-        })
+        currentChats.map((chat) =>
+          chat.id === requestChatId
+            ? {
+                ...chat,
+                messages: [...nextMessages, assistantMessage],
+                updatedAt: Date.now(),
+              }
+            : chat,
+        ),
       );
-    } catch (err) {
-      setError(err.message || "Failed to get a response.");
+    } catch (error) {
+      setChatError(error.message || "Не удалось получить ответ.");
     } finally {
-      setIsLoading(false);
+      setIsAnswerLoading(false);
     }
-  }
-
-  function createRecognition() {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      return null;
-    }
-
-    const recognition = new SpeechRecognition();
-
-    recognition.lang = "ru-RU";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-
-      for (let i = 0; i < event.results.length; i += 1) {
-        const transcript = event.results[i][0].transcript;
-
-        if (event.results[i].isFinal) {
-          finalTranscript += `${transcript} `;
-        } else {
-          interimTranscript += `${transcript} `;
-        }
-      }
-
-      const combinedText = [
-        voiceBaseTextRef.current.trim(),
-        finalTranscript.trim(),
-        interimTranscript.trim(),
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      setDraft(combinedText);
-    };
-
-    recognition.onerror = () => {
-      setError("Voice recognition failed. Please try again.");
-    };
-
-    recognition.onend = () => {
-      if (shouldKeepListeningRef.current) {
-        voiceBaseTextRef.current = draftRef.current;
-
-        window.setTimeout(() => {
-          try {
-            recognition.start();
-          } catch {
-            setIsListening(false);
-          }
-        }, 250);
-
-        return;
-      }
-
-      setIsListening(false);
-    };
-
-    return recognition;
-  }
-
-  function toggleVoiceInput() {
-    setError("");
-
-    if (!isVoiceSupported) {
-      setError("Voice input is not available in this browser.");
-      return;
-    }
-
-    if (isListening) {
-      shouldKeepListeningRef.current = false;
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
-    const recognition = createRecognition();
-
-    if (!recognition) {
-      setError("Voice input is not available in this browser.");
-      return;
-    }
-
-    recognitionRef.current = recognition;
-    shouldKeepListeningRef.current = true;
-    voiceBaseTextRef.current = draftRef.current;
-
-    try {
-      recognition.start();
-    } catch {
-      setError("Could not start voice recognition.");
-      setIsListening(false);
-      shouldKeepListeningRef.current = false;
-    }
-  }
-
-  function startNewChat() {
-    const chat = createChat();
-
-    setChats((currentChats) => [chat, ...currentChats]);
-    setActiveChatId(chat.id);
-    setDraft("");
-    setError("");
-  }
-
-  function deleteChat(chatId) {
-    setChats((currentChats) => {
-      const nextChats = currentChats.filter((chat) => chat.id !== chatId);
-
-      if (nextChats.length === 0) {
-        const chat = createChat();
-        setActiveChatId(chat.id);
-        return [chat];
-      }
-
-      if (chatId === activeChatId) {
-        setActiveChatId(nextChats[0].id);
-      }
-
-      return nextChats;
-    });
-  }
-
-  function selectChat(chatId) {
-    setActiveChatId(chatId);
-    setDraft("");
-    setError("");
   }
 
   return (
-    <main className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#dbeafe_0,_transparent_34%),linear-gradient(135deg,_#f8fafc_0%,_#eef2ff_48%,_#f8fafc_100%)] text-slate-950">
+    <div className="app-shell">
       <Sidebar
-        chats={chats}
+        activeView={activeView}
         activeChatId={activeChatId}
-        onSelectChat={selectChat}
-        onNewChat={startNewChat}
+        chats={chats}
+        groupCode={groupCode}
+        isMobileOpen={isMobileMenuOpen}
+        sourceStatus={sourceStatus}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
         onDeleteChat={deleteChat}
+        onNewChat={startNewChat}
+        onOpenDrawer={setDrawerName}
+        onSelectChat={selectChat}
+        onViewChange={openView}
       />
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-5">
-        <header className="mb-4 flex shrink-0 items-center justify-between rounded-3xl border border-white/70 bg-white/80 px-5 py-4 shadow-sm shadow-slate-200/70 backdrop-blur">
-          <div>
-            <p className="text-sm font-semibold text-blue-600">AI Assistant</p>
-            <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
-              {activeChat?.title || "New chat"}
-            </h1>
-          </div>
+      <main className="workspace">
+        <TopBar
+          groupCode={groupCode}
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+        />
 
-          <button
-            type="button"
-            onClick={startNewChat}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 md:hidden"
-          >
-            New chat
-          </button>
-        </header>
-
-        <div className="flex min-h-0 flex-1 flex-col rounded-[2rem] border border-white/70 bg-white/65 p-3 shadow-2xl shadow-slate-200/80 backdrop-blur sm:p-5">
-          <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 pt-2 sm:px-3">
-            {activeChat?.messages.length === 0 ? (
-              <EmptyState onSuggestionClick={setDraft} />
-            ) : (
-              <div className="mx-auto flex max-w-3xl flex-col gap-4">
-                {activeChat.messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} />
-                ))}
-
-                {isLoading && <LoadingBubble />}
-
-                {error && (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {error}
-                  </div>
-                )}
-
-                <div ref={chatEndRef} />
+        {activeView === "home" ? (
+          <HomeDashboard
+            dashboard={dashboard}
+            error={dashboardError}
+            groupCode={groupCode}
+            isLoading={isDashboardLoading}
+            onAsk={sendMessage}
+            onOpenDrawer={setDrawerName}
+          />
+        ) : (
+          <section className="chat-view">
+            <header className="chat-header">
+              <div className="chat-heading">
+                <span className="section-index">AI</span>
+                <div>
+                  <small>ДИАЛОГ С НАВИГАТОРОМ</small>
+                  <h1>{activeChat?.title || "Новый диалог"}</h1>
+                </div>
               </div>
-            )}
-          </div>
+              <button className="text-button" type="button" onClick={startNewChat}>
+                ＋ Новый диалог
+              </button>
+            </header>
 
-          <div className="mx-auto w-full max-w-3xl shrink-0">
+            <div className="chat-scroll">
+              {activeChat?.messages.length === 0 ? (
+                <EmptyState onSuggestionClick={sendMessage} />
+              ) : (
+                <div className="messages">
+                  {activeChat.messages.map((message) => (
+                    <ChatMessage
+                      key={message.id}
+                      message={message}
+                      onAction={(action) => setDrawerName(action.type)}
+                    />
+                  ))}
+                  {isAnswerLoading && <LoadingBubble />}
+                  {chatError && <div className="error-banner">{chatError}</div>}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+            </div>
+
             <ChatComposer
               value={draft}
               onChange={setDraft}
-              onSubmit={sendMessage}
-              onVoiceToggle={toggleVoiceInput}
-              isLoading={isLoading}
-              isListening={isListening}
-              isVoiceSupported={isVoiceSupported}
+              onSubmit={() => sendMessage()}
+              isLoading={isAnswerLoading}
             />
-          </div>
-        </div>
-      </section>
-    </main>
+          </section>
+        )}
+      </main>
+
+      <ContextDrawer
+        dashboard={dashboard}
+        name={drawerName}
+        onClose={() => setDrawerName(null)}
+      />
+    </div>
   );
 }
-
-export default App;

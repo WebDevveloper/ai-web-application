@@ -1,0 +1,97 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createAssistantService } from "../src/services/assistantService.js";
+
+function createRepository(overrides = {}) {
+  return {
+    getSchedule: async () => [],
+    getDeadlines: async () => [],
+    findLocations: async () => [],
+    findDepartments: async () => [],
+    searchKnowledge: async () => [],
+    ...overrides,
+  };
+}
+
+test("schedule questions are answered from PostgreSQL without calling AI", async () => {
+  let requestedGroup;
+  const campusRepository = createRepository({
+    getSchedule: async (groupCode) => {
+      requestedGroup = groupCode;
+      return [
+        {
+          id: "lesson-1",
+          subject: "Программирование",
+          startTime: "10:00:00",
+          endTime: "11:30:00",
+          room: "101",
+          building: "Корпус А",
+          source: null,
+        },
+      ];
+    },
+  });
+  const mistralClient = {
+    complete: async () => assert.fail("AI must not be called for a schedule"),
+  };
+  const service = createAssistantService({ campusRepository, mistralClient });
+
+  const result = await service.answer({
+    messages: [{ role: "user", content: "Какие пары сегодня?" }],
+    groupCode: "261-321",
+  });
+
+  assert.equal(requestedGroup, "261-321");
+  assert.equal(result.answerType, "schedule");
+  assert.match(result.answer, /Программирование/);
+});
+
+test("knowledge questions send only retrieved context to AI", async () => {
+  const campusRepository = createRepository({
+    searchKnowledge: async () => [
+      {
+        id: "chunk-1",
+        heading: "Справка",
+        content: "Подтверждённая инструкция.",
+        sectionPath: "Документы",
+        sourceId: "source-1",
+        sourceTitle: "Регламент",
+        sourceUrl: "https://example.edu/regulation",
+        sourceUpdatedAt: "2026-10-01",
+      },
+    ],
+  });
+  let modelRequest;
+  const mistralClient = {
+    complete: async (request) => {
+      modelRequest = request;
+      return "Ответ по регламенту [1].";
+    },
+  };
+  const service = createAssistantService({ campusRepository, mistralClient });
+
+  const result = await service.answer({
+    messages: [{ role: "user", content: "Как получить справку?" }],
+    groupCode: "261-321",
+  });
+
+  assert.match(modelRequest.messages.at(-1).content, /Подтверждённая инструкция/);
+  assert.match(modelRequest.systemPrompt, /только сведения из блока/);
+  assert.equal(result.sources[0].title, "Регламент");
+});
+
+test("assistant does not call AI when no verified source was found", async () => {
+  const campusRepository = createRepository();
+  const mistralClient = {
+    complete: async () => assert.fail("AI must not answer without sources"),
+  };
+  const service = createAssistantService({ campusRepository, mistralClient });
+
+  const result = await service.answer({
+    messages: [{ role: "user", content: "Как получить неизвестную услугу?" }],
+    groupCode: "261-321",
+  });
+
+  assert.equal(result.answerType, "not_found");
+  assert.deepEqual(result.sources, []);
+});
