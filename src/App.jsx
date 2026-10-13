@@ -283,7 +283,7 @@ export default function App() {
           <section className="chat-view">
             <header className="chat-header">
               <div className="chat-heading">
-                <span className="section-index">AI</span>
+                <span className="section-index">ПН</span>
                 <div>
                   <small>ДИАЛОГ С НАВИГАТОРОМ</small>
                   <h1>{activeChat?.title || "Новый диалог"}</h1>

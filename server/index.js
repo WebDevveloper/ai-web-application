@@ -14,6 +14,7 @@ const assistantService = createAssistantService({
   campusRepository,
   aiClient,
   timeZone: config.campusTimeZone,
+  useAi: config.assistantMode === "openai",
 });
 
 const app = createApp({ assistantService, campusRepository, config });

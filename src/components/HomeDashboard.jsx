@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 const suggestedQuestions = [
-  "Что мне нужно сделать до конца недели?",
-  "Где находится мой учебный офис?",
-  "Как оформить академический отпуск?",
+  "Как получить справку в социальные учреждения?",
+  "Где находится главный корпус?",
+  "Куда написать, если не работает LMS?",
 ];
 
 function formatTime(value) {
@@ -61,7 +61,7 @@ export default function HomeDashboard({ dashboard, error, groupCode, isLoading, 
                 </div>
               ))}
             </div>
-          ) : <p className="empty-card-text">На сегодня занятий в подключённом расписании нет.</p>}
+          ) : <p className="empty-card-text">Расписание группы пока не импортировано. Актуальные пары можно запросить в чате.</p>}
         </article>
 
         <article className="card deadline-card">
@@ -72,15 +72,15 @@ export default function HomeDashboard({ dashboard, error, groupCode, isLoading, 
               <h3>{nextDeadline.title}</h3><p>{nextDeadline.subject || `Группа ${groupCode}`}</p>
               <div className="deadline-actions"><button className="primary-small" type="button" onClick={() => onAsk(`Что нужно для выполнения: ${nextDeadline.title}?`)}>Условия</button><button className="secondary-small" type="button" onClick={() => onOpenDrawer("day")}>Все сроки</button></div>
             </div>
-          ) : <p className="empty-card-text">Ближайшие дедлайны не найдены.</p>}
+          ) : <p className="empty-card-text">Подтверждённые дедлайны группы пока не подключены.</p>}
         </article>
 
         <article className="card quick-card">
           <div className="card-head"><div><span className="section-index mint">03</span><h2>Найти быстро</h2></div></div>
           <div className="quick-links">
             <button type="button" onClick={() => onOpenDrawer("campus")}><i>◎</i><span><strong>Корпус или аудитория</strong><small>Маршрут и вход</small></span><b>→</b></button>
-            <button type="button" onClick={() => onAsk("Куда обратиться по организационному вопросу?")}><i>↗</i><span><strong>К кому обратиться</strong><small>Контакты и часы работы</small></span><b>→</b></button>
-            <button type="button" onClick={() => onAsk("Какие документы нужны для справки об обучении?")}><i>≡</i><span><strong>Документы и справки</strong><small>Порядок получения</small></span><b>→</b></button>
+            <button type="button" onClick={() => onAsk("Куда написать, если не работает LMS?")}><i>↗</i><span><strong>К кому обратиться</strong><small>Контакты поддержки</small></span><b>→</b></button>
+            <button type="button" onClick={() => onAsk("Как получить справку в социальные учреждения?")}><i>≡</i><span><strong>Документы и справки</strong><small>Порядок получения</small></span><b>→</b></button>
           </div>
         </article>
       </section>

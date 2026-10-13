@@ -7,6 +7,7 @@ import {
 import {
   formatContactResponse,
   formatDeadlineResponse,
+  formatKnowledgeResponse,
   formatLocationResponse,
   formatScheduleResponse,
   sourcesFromKnowledge,
@@ -16,6 +17,7 @@ export function createAssistantService({
   campusRepository,
   aiClient,
   timeZone = "Europe/Moscow",
+  useAi = false,
 }) {
   return {
     async answer({ messages, groupCode }) {
@@ -25,7 +27,19 @@ export function createAssistantService({
       if (intent === "schedule") {
         const studyDate = resolveStudyDate(question, new Date(), timeZone);
         const entries = await campusRepository.getSchedule(groupCode, studyDate);
-        return formatScheduleResponse(entries, studyDate);
+
+        if (entries.length > 0) {
+          return formatScheduleResponse(entries, studyDate);
+        }
+
+        const scheduleSources = await campusRepository.searchKnowledge(
+          "официальное расписание",
+        );
+        return formatScheduleResponse(
+          entries,
+          studyDate,
+          sourcesFromKnowledge(scheduleSources),
+        );
       }
 
       if (intent === "deadline") {
@@ -59,22 +73,37 @@ export function createAssistantService({
         };
       }
 
-      const { systemPrompt, userPrompt } = buildCampusPrompt({
-        question,
-        chunks,
-        groupCode,
-      });
-      const answer = await aiClient.complete({
-        systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      });
+      // Базовый режим работает без внешнего API: он показывает найденные
+      // официальные фрагменты без пересказа языковой моделью.
+      if (!useAi || !aiClient.isConfigured?.()) {
+        return formatKnowledgeResponse(chunks);
+      }
 
-      return {
-        answer,
-        answerType: "knowledge",
-        sources: sourcesFromKnowledge(chunks),
-        actions: [],
-      };
+      try {
+        const { systemPrompt, userPrompt } = buildCampusPrompt({
+          question,
+          chunks,
+          groupCode,
+        });
+        const answer = await aiClient.complete({
+          systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+
+        return {
+          answer,
+          answerType: "knowledge",
+          sources: sourcesFromKnowledge(chunks),
+          actions: [],
+        };
+      } catch (error) {
+        // Сбой платного провайдера не должен ломать справочник кампуса.
+        if (["AI_NOT_CONFIGURED", "AI_REQUEST_FAILED"].includes(error.code)) {
+          return formatKnowledgeResponse(chunks);
+        }
+
+        throw error;
+      }
     },
   };
 }

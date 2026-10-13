@@ -28,6 +28,7 @@ export const config = {
   clientOrigins,
   defaultGroupCode: process.env.DEFAULT_GROUP_CODE || "261-321",
   campusTimeZone: process.env.CAMPUS_TIME_ZONE || "Europe/Moscow",
+  assistantMode: process.env.ASSISTANT_MODE || "verified-data",
   database: {
     connectionString: process.env.DATABASE_URL || "",
     useSsl: parseBoolean(process.env.DATABASE_SSL),

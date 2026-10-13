@@ -13,6 +13,9 @@ export function createOpenAiClient({
     : null;
 
   return {
+    isConfigured() {
+      return Boolean(client);
+    },
     async complete({ systemPrompt, messages }) {
       if (!client) {
         const error = new Error("OPENAI_API_KEY is not configured.");

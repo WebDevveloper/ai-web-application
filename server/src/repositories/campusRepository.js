@@ -36,7 +36,7 @@ export function createCampusRepository(
          source.id AS source_id,
          source.title AS source_title,
          source.canonical_url AS source_url,
-         source.updated_at AS source_updated_at
+         source.last_checked_at AS source_updated_at
        FROM schedule_entries AS schedule
        INNER JOIN study_groups AS study_group ON study_group.id = schedule.group_id
        LEFT JOIN campus_locations AS location ON location.id = schedule.location_id
@@ -71,7 +71,7 @@ export function createCampusRepository(
          source.id AS source_id,
          source.title AS source_title,
          source.canonical_url AS source_url,
-         source.updated_at AS source_updated_at
+         source.last_checked_at AS source_updated_at
        FROM deadlines AS deadline
        LEFT JOIN study_groups AS study_group ON study_group.id = deadline.group_id
        LEFT JOIN knowledge_sources AS source ON source.id = deadline.source_id
@@ -108,7 +108,7 @@ export function createCampusRepository(
          source.id AS source_id,
          source.title AS source_title,
          source.canonical_url AS source_url,
-         source.updated_at AS source_updated_at
+         source.last_checked_at AS source_updated_at
        FROM campus_locations AS location
        LEFT JOIN knowledge_sources AS source ON source.id = location.source_id
        WHERE cardinality($1::text[]) = 0
@@ -147,7 +147,7 @@ export function createCampusRepository(
          source.id AS source_id,
          source.title AS source_title,
          source.canonical_url AS source_url,
-         source.updated_at AS source_updated_at
+         source.last_checked_at AS source_updated_at
        FROM departments AS department
        LEFT JOIN campus_locations AS location ON location.id = department.office_location_id
        LEFT JOIN knowledge_sources AS source ON source.id = department.source_id
@@ -187,7 +187,7 @@ export function createCampusRepository(
          source.id AS "sourceId",
          source.title AS "sourceTitle",
          source.canonical_url AS "sourceUrl",
-         source.updated_at AS "sourceUpdatedAt",
+         source.last_checked_at AS "sourceUpdatedAt",
          ts_rank(chunk.search_vector, search_query.value) AS rank
        FROM knowledge_chunks AS chunk
        INNER JOIN knowledge_sources AS source ON source.id = chunk.source_id

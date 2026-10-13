@@ -21,12 +21,12 @@ export function collectSources(items) {
   return [...uniqueSources.values()];
 }
 
-export function formatScheduleResponse(entries, studyDate) {
+export function formatScheduleResponse(entries, studyDate, fallbackSources = []) {
   if (entries.length === 0) {
     return {
-      answer: `На ${formatStudyDate(studyDate)} занятий в подключённом расписании не найдено. Проверьте, что выбрана верная группа.`,
+      answer: `Расписание выбранной группы на ${formatStudyDate(studyDate)} ещё не импортировано в базу. Проверьте актуальные занятия в официальном сервисе по источнику ниже.`,
       answerType: "schedule",
-      sources: [],
+      sources: fallbackSources,
       actions: [{ type: "day", label: "Открыть мой день" }],
     };
   }
@@ -47,7 +47,7 @@ export function formatScheduleResponse(entries, studyDate) {
 export function formatDeadlineResponse(deadlines, timeZone) {
   if (deadlines.length === 0) {
     return {
-      answer: "Активных дедлайнов для вашей группы в базе не найдено.",
+      answer: "В подключённой базе пока нет подтверждённых сведений о дедлайнах вашей группы. Это не означает, что учебных сроков нет — проверьте LMS и сообщения преподавателя.",
       answerType: "deadline",
       sources: [],
       actions: [{ type: "day", label: "Открыть мой день" }],
@@ -120,6 +120,20 @@ export function formatContactResponse(departments) {
     answerType: "contact",
     sources: collectSources(departments),
     actions: [{ type: "help", label: "Открыть помощь" }],
+  };
+}
+
+export function formatKnowledgeResponse(chunks) {
+  const lines = chunks.slice(0, 3).map((chunk) => {
+    const heading = chunk.sectionPath || chunk.heading;
+    return `• ${heading}: ${chunk.content}`;
+  });
+
+  return {
+    answer: `По данным подключённых официальных материалов:\n${lines.join("\n")}`,
+    answerType: "verified_data",
+    sources: sourcesFromKnowledge(chunks),
+    actions: [],
   };
 }
 

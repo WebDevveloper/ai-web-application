@@ -58,7 +58,7 @@ export default function ChatMessage({ message, onAction }) {
 
   return (
     <article className="message assistant-message">
-      <div className="assistant-avatar" aria-hidden="true">AI</div>
+      <div className="assistant-avatar" aria-hidden="true">ПН</div>
       <div className="assistant-message-body">
         <div className="assistant-bubble">
           <p className="answer-text">{message.content}</p>
