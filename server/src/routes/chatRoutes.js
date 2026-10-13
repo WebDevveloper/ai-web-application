@@ -31,7 +31,7 @@ export function createChatRouter({ assistantService, config }) {
     } catch (error) {
       if (error.code === "AI_NOT_CONFIGURED") {
         response.status(503).json({
-          error: "ИИ-модель ещё не настроена. Укажите MISTRAL_API_KEY на сервере.",
+          error: "ИИ-модель ещё не настроена. Укажите OPENAI_API_KEY на сервере.",
         });
         return;
       }

@@ -14,7 +14,7 @@ import {
 
 export function createAssistantService({
   campusRepository,
-  mistralClient,
+  aiClient,
   timeZone = "Europe/Moscow",
 }) {
   return {
@@ -64,7 +64,7 @@ export function createAssistantService({
         chunks,
         groupCode,
       });
-      const answer = await mistralClient.complete({
+      const answer = await aiClient.complete({
         systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       });

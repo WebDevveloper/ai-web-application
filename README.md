@@ -12,7 +12,7 @@ MVP ИИ-ассистента для первокурсника: расписа�
 - домашняя сводка для выбранной группы;
 - отдельные сценарии расписания, дедлайнов, мест и контактов;
 - поиск по русскоязычным материалам PostgreSQL Full Text Search;
-- ответ Mistral только при наличии найденного проверенного источника;
+- ответ OpenAI только при наличии найденного проверенного источника;
 - карточки источников и дата их проверки;
 - оценка полезности ответа;
 - импорт `.md` и `.txt` документов через серверную команду;
@@ -28,7 +28,7 @@ server/
   db/migrations/           схема PostgreSQL
   db/seed.sql              только демонстрационные записи
   src/repositories/        SQL-запросы к данным кампуса
-  src/services/            сценарии ответов, поиск и Mistral
+  src/services/            сценарии ответов, поиск и OpenAI
   src/routes/              HTTP API
   test/                    модульные тесты backend
 docs/                      требования, архитектура и валидация
@@ -57,7 +57,17 @@ npm run db:seed
 npm run dev
 ```
 
-В `server/.env` нужно заменить `MISTRAL_API_KEY`. Ключ хранится только на сервере и никогда не должен иметь префикс `VITE_`.
+В `server/.env` нужно заменить настройки модели:
+
+```text
+OPENAI_API_KEY=ваш-серверный-ключ
+OPENAI_MODEL=gpt-6-luna
+OPENAI_TIMEOUT_MS=20000
+OPENAI_MAX_OUTPUT_TOKENS=600
+OPENAI_REASONING_EFFORT=none
+```
+
+Ключ хранится только на сервере и никогда не должен иметь префикс `VITE_`.
 
 Backend будет доступен на `http://localhost:3000`.
 
@@ -153,7 +163,7 @@ VITE_API_URL=https://адрес-backend-на-railway
 VITE_DEFAULT_GROUP_CODE=261-321
 ```
 
-`VITE_API_URL` является публичным адресом API, а не секретом. Ключ Mistral и `DATABASE_URL` должны оставаться только в Railway.
+`VITE_API_URL` является публичным адресом API, а не секретом. Ключ OpenAI и `DATABASE_URL` должны оставаться только в Railway.
 
 ## Ограничения первой версии
 

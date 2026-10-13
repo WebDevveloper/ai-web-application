@@ -32,9 +32,11 @@ export const config = {
     connectionString: process.env.DATABASE_URL || "",
     useSsl: parseBoolean(process.env.DATABASE_SSL),
   },
-  mistral: {
-    apiKey: process.env.MISTRAL_API_KEY || "",
-    model: process.env.MISTRAL_MODEL || "mistral-small-latest",
-    timeoutMs: Number(process.env.MISTRAL_TIMEOUT_MS) || 20_000,
+  openAi: {
+    apiKey: process.env.OPENAI_API_KEY || "",
+    model: process.env.OPENAI_MODEL || "gpt-6-luna",
+    timeoutMs: Number(process.env.OPENAI_TIMEOUT_MS) || 20_000,
+    maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS) || 600,
+    reasoningEffort: process.env.OPENAI_REASONING_EFFORT || "none",
   },
 };

@@ -31,10 +31,10 @@ test("schedule questions are answered from PostgreSQL without calling AI", async
       ];
     },
   });
-  const mistralClient = {
+  const aiClient = {
     complete: async () => assert.fail("AI must not be called for a schedule"),
   };
-  const service = createAssistantService({ campusRepository, mistralClient });
+  const service = createAssistantService({ campusRepository, aiClient });
 
   const result = await service.answer({
     messages: [{ role: "user", content: "Какие пары сегодня?" }],
@@ -62,13 +62,13 @@ test("knowledge questions send only retrieved context to AI", async () => {
     ],
   });
   let modelRequest;
-  const mistralClient = {
+  const aiClient = {
     complete: async (request) => {
       modelRequest = request;
       return "Ответ по регламенту [1].";
     },
   };
-  const service = createAssistantService({ campusRepository, mistralClient });
+  const service = createAssistantService({ campusRepository, aiClient });
 
   const result = await service.answer({
     messages: [{ role: "user", content: "Как получить справку?" }],
@@ -82,10 +82,10 @@ test("knowledge questions send only retrieved context to AI", async () => {
 
 test("assistant does not call AI when no verified source was found", async () => {
   const campusRepository = createRepository();
-  const mistralClient = {
+  const aiClient = {
     complete: async () => assert.fail("AI must not answer without sources"),
   };
-  const service = createAssistantService({ campusRepository, mistralClient });
+  const service = createAssistantService({ campusRepository, aiClient });
 
   const result = await service.answer({
     messages: [{ role: "user", content: "Как получить неизвестную услугу?" }],
