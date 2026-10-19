@@ -1,6 +1,7 @@
 import { buildCampusPrompt } from "../prompts/campusPrompt.js";
 import {
   classifyIntent,
+  extractTeacherQuery,
   extractSearchTerms,
   resolveStudyDate,
 } from "./intentClassifier.js";
@@ -10,6 +11,7 @@ import {
   formatKnowledgeResponse,
   formatLocationResponse,
   formatScheduleResponse,
+  formatTeacherResponse,
   sourcesFromKnowledge,
 } from "./responseFormatters.js";
 
@@ -23,6 +25,16 @@ export function createAssistantService({
     async answer({ messages, groupCode }) {
       const question = messages.at(-1).content;
       const intent = classifyIntent(question);
+
+      if (intent === "teacher") {
+        const name = extractTeacherQuery(question);
+        if (!name) return {
+          answer: "Укажите фамилию, например: «Преподаватель Зайцев».",
+          answerType: "teacher", sources: [], actions: [{ type: "teachers", label: "Поиск преподавателя" }],
+        };
+        const teachers = await campusRepository.findTeachers(name);
+        return formatTeacherResponse(teachers);
+      }
 
       if (intent === "schedule") {
         const studyDate = resolveStudyDate(question, new Date(), timeZone);

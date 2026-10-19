@@ -3,6 +3,7 @@ function formatCurrentDate() {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: "Europe/Moscow",
   }).format(new Date());
 }
 

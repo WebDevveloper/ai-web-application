@@ -19,9 +19,10 @@ function mapSource(row) {
 
 export function createCampusRepository(
   database,
-  { timeZone = "Europe/Moscow" } = {},
+  { timeZone = "Europe/Moscow", navigatorRepository = null } = {},
 ) {
   async function getSchedule(groupCode, studyDate) {
+    if (navigatorRepository) return navigatorRepository.getSchedule(groupCode, studyDate);
     const result = await database.query(
       `SELECT
          schedule.id,
@@ -94,6 +95,7 @@ export function createCampusRepository(
   }
 
   async function findLocations(terms = [], limit = 6) {
+    if (navigatorRepository) return navigatorRepository.findLocations(terms, limit);
     const patterns = buildSearchPatterns(terms);
     const result = await database.query(
       `SELECT
@@ -213,18 +215,25 @@ export function createCampusRepository(
     findLocations,
     findDepartments,
     searchKnowledge,
+    findTeachers: (query) => navigatorRepository ? navigatorRepository.findTeachers(query) : Promise.resolve([]),
+    findRooms: (query) => navigatorRepository ? navigatorRepository.findRooms(query) : Promise.resolve([]),
+    getNavigatorStatus: () => navigatorRepository
+      ? navigatorRepository.getStatus()
+      : Promise.resolve({ enabled: false, importedAt: null }),
     async getDashboard(groupCode) {
       const today = getIsoDate(new Date(), timeZone);
-      const [lessons, deadlines, locations] = await Promise.all([
+      const [lessons, deadlines, locations, navigator] = await Promise.all([
         getSchedule(groupCode, today),
         getDeadlines(groupCode, 4),
         findLocations([], 4),
+        navigatorRepository ? navigatorRepository.getStatus() : { enabled: false, importedAt: null },
       ]);
 
       return {
         groupCode,
         date: today,
         lessons,
+        navigator,
         deadlines: deadlines.map((deadline) => ({
           ...deadline,
           dueTime: new Intl.DateTimeFormat("ru-RU", {

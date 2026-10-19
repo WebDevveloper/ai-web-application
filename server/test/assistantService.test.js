@@ -67,7 +67,7 @@ test("missing schedule points to the official schedule source", async () => {
     groupCode: "261-321",
   });
 
-  assert.match(result.answer, /не импортировано/);
+  assert.match(result.answer, /нет записей/);
   assert.equal(result.sources[0].title, "Официальное расписание");
 });
 

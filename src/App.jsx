@@ -66,6 +66,32 @@ function loadChats() {
   }
 }
 
+function getSourceStatus(isLoading, error, navigator) {
+  if (isLoading)
+    return {
+      state: "loading",
+      title: "Загружаем данные",
+      details: "расписание и справочники кампуса",
+    };
+  if (error)
+    return {
+      state: "error",
+      title: "Источники недоступны",
+      details: "попробуйте зайти позднее",
+    };
+  if (navigator?.enabled)
+    return {
+      state: "ready",
+      title: "Снимок данных подключён",
+      details: "изменения сверяйте с расписанием",
+    };
+  return {
+    state: "ready",
+    title: "Источники подключены",
+    details: "даты проверки указаны в ответах",
+  };
+}
+
 export default function App() {
   const [initialChats] = useState(loadChats);
   const [chats, setChats] = useState(initialChats.chats);
@@ -86,29 +112,22 @@ export default function App() {
     () => chats.find((chat) => chat.id === activeChatId) || chats[0],
     [activeChatId, chats],
   );
-  const sourceStatus = isDashboardLoading
-    ? {
-        state: "loading",
-        title: "Проверяем источники",
-        details: "загружаем данные кампуса",
-      }
-    : dashboardError
-      ? {
-          state: "error",
-          title: "Источники недоступны",
-          details: "проверьте подключение сервера",
-        }
-      : {
-          state: "ready",
-          title: "Источники подключены",
-          details: "актуальность указана в ответах",
-        };
+  const sourceStatus = getSourceStatus(
+    isDashboardLoading,
+    dashboardError,
+    dashboard?.navigator,
+  );
 
   useEffect(() => {
-    localStorage.setItem(
-      CHAT_STORAGE_KEY,
-      JSON.stringify({ chats, activeChatId }),
-    );
+    try {
+      localStorage.setItem(
+        CHAT_STORAGE_KEY,
+        JSON.stringify({ chats, activeChatId }),
+      );
+    } catch {
+      // В приватном режиме или при заполненном хранилище диалог остаётся в памяти.
+      console.warn("Историю диалогов не удалось сохранить в браузере.");
+    }
   }, [chats, activeChatId]);
 
   useEffect(() => {
@@ -289,7 +308,11 @@ export default function App() {
                   <h1>{activeChat?.title || "Новый диалог"}</h1>
                 </div>
               </div>
-              <button className="text-button" type="button" onClick={startNewChat}>
+              <button
+                className="text-button"
+                type="button"
+                onClick={startNewChat}
+              >
                 ＋ Новый диалог
               </button>
             </header>

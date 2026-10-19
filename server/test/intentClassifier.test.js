@@ -29,3 +29,11 @@ test("resolveStudyDate handles tomorrow in campus time", () => {
     "2026-10-13",
   );
 });
+
+test("даты расписания не подменяются сегодняшним днём", () => {
+  const now = new Date("2026-10-12T22:30:00Z");
+  assert.equal(resolveStudyDate("Послезавтра", now), "2026-10-15");
+  assert.equal(resolveStudyDate("Расписание на 2026-11-09", now), "2026-11-09");
+  assert.throws(() => resolveStudyDate("Расписание на 2026-02-30", now), { code: "INVALID_INPUT" });
+  assert.equal(classifyIntent("Почта преподавателя Зайцев"), "teacher");
+});

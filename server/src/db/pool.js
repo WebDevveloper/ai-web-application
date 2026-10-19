@@ -6,12 +6,16 @@ export function createDatabase({ connectionString, useSsl }) {
   const pool = connectionString
     ? new Pool({
         connectionString,
-        ssl: useSsl ? { rejectUnauthorized: false } : false,
+        ssl: useSsl ? { rejectUnauthorized: true } : undefined,
         max: 10,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 5_000,
       })
     : null;
+
+  pool?.on("error", (error) => {
+    console.error("Ошибка свободного соединения PostgreSQL:", error.message);
+  });
 
   async function query(text, values = []) {
     if (!pool) {

@@ -42,6 +42,11 @@ export function createApp({ assistantService, campusRepository, config }) {
   app.get("/api/health", async (_request, response) => {
     try {
       const databaseConnected = await campusRepository.ping();
+      const navigator = databaseConnected ? await campusRepository.getNavigatorStatus?.() : null;
+      if (navigator?.enabled && !navigator.importedAt) {
+        response.status(503).json({ status: "degraded", database: "connected", navigator: "not_imported" });
+        return;
+      }
       response.status(databaseConnected ? 200 : 503).json({
         status: databaseConnected ? "ok" : "degraded",
         database: databaseConnected ? "connected" : "not_configured",

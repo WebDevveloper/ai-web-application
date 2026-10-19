@@ -24,7 +24,7 @@ export function collectSources(items) {
 export function formatScheduleResponse(entries, studyDate, fallbackSources = []) {
   if (entries.length === 0) {
     return {
-      answer: `Расписание выбранной группы на ${formatStudyDate(studyDate)} ещё не импортировано в базу. Проверьте актуальные занятия в официальном сервисе по источнику ниже.`,
+      answer: `В подключённых данных нет записей для выбранной группы на ${formatStudyDate(studyDate)}. Это не означает, что занятий нет: сверьтесь с официальным расписанием.`,
       answerType: "schedule",
       sources: fallbackSources,
       actions: [{ type: "day", label: "Открыть мой день" }],
@@ -33,14 +33,33 @@ export function formatScheduleResponse(entries, studyDate, fallbackSources = [])
 
   const lines = entries.map((entry) => {
     const place = compact([entry.room, entry.building]).join(", ");
-    return `• ${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)} — ${entry.subject}${place ? `, ${place}` : ""}`;
+    const time = entry.startTime && entry.endTime
+      ? `${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
+      : "Время уточняется";
+    return `• ${time} — ${entry.subject}${place ? `, ${place}` : ""}${entry.teacherName ? ` · ${entry.teacherName}` : ""}`;
   });
 
   return {
-    answer: `Расписание на ${formatStudyDate(studyDate)}:\n${lines.join("\n")}`,
+    answer: `Расписание${entries.some((entry) => entry.source?.type === "snapshot") ? " по загруженному снимку" : ""} на ${formatStudyDate(studyDate)}:\n${lines.join("\n")}`,
     answerType: "schedule",
     sources: collectSources(entries),
     actions: [{ type: "day", label: "Открыть весь день" }],
+  };
+}
+
+export function formatTeacherResponse(teachers) {
+  const lines = teachers.map((teacher) => {
+    const details = compact([teacher.department, teacher.position]).join(" · ");
+    const subjects = teacher.subjects?.length ? `\n  Дисциплины: ${teacher.subjects.join(", ")}` : "";
+    return `• ${teacher.fullName}${details ? ` — ${details}` : ""}\n  ${teacher.email || "Email не указан в справочнике"}${subjects}`;
+  });
+  return {
+    answer: teachers.length
+      ? `Преподаватели по загруженному справочнику:\n${lines.join("\n")}`
+      : "Преподаватель не найден. Укажите фамилию так, как она записана в расписании, или проверьте подключение справочника.",
+    answerType: "teacher",
+    sources: collectSources(teachers),
+    actions: [{ type: "teachers", label: "Поиск преподавателя" }],
   };
 }
 
@@ -90,7 +109,7 @@ export function formatLocationResponse(locations) {
     answer: `Подходящие места:\n${lines.join("\n")}`,
     answerType: "location",
     sources: collectSources(locations),
-    actions: [{ type: "campus", label: "Открыть карту кампуса" }],
+      actions: [{ type: "campus", label: "Открыть справочник кампуса" }],
   };
 }
 

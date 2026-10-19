@@ -7,7 +7,17 @@ async function readJson(response) {
     throw new Error(data?.error || "Сервис кампуса временно недоступен.");
   }
 
+  if (!data || typeof data !== "object") {
+    throw new Error("Сервис кампуса вернул некорректный ответ.");
+  }
+
   return data;
+}
+
+export async function searchDirectory(kind, query) {
+  const route = kind === "teachers" ? "teachers" : "rooms";
+  const searchParams = new URLSearchParams({ q: query });
+  return readJson(await fetch(`${API_URL}/api/${route}?${searchParams}`));
 }
 
 export async function getDashboard(groupCode) {

@@ -265,3 +265,17 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+/* Поиск в боковом справочнике использует те же кнопки и отступы, что и карточки. */
+.directory-search {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.directory-search input {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #c9cec9;
+  border-radius: 8px;
+  font: inherit;
+}
