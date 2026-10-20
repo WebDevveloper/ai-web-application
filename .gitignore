@@ -9,8 +9,13 @@ lerna-debug.log*
 
 node_modules
 .env
+.env.*
+!.env.example
+!server/.env.example
 dist
 dist-ssr
+test-results
+playwright-report
 .DS_Store
 *.local
 
