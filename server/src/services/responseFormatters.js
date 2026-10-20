@@ -1,7 +1,4 @@
-import {
-  formatDateTime,
-  formatStudyDate,
-} from "../utils/dateTime.js";
+import { formatDateTime, formatStudyDate } from "../utils/dateTime.js";
 
 function compact(values) {
   return values.filter(Boolean);
@@ -21,21 +18,28 @@ export function collectSources(items) {
   return [...uniqueSources.values()];
 }
 
-export function formatScheduleResponse(entries, studyDate, fallbackSources = []) {
+export function formatScheduleResponse(
+  entries,
+  studyDate,
+  fallbackSources = [],
+) {
   if (entries.length === 0) {
     return {
       answer: `В подключённых данных нет записей для выбранной группы на ${formatStudyDate(studyDate)}. Это не означает, что занятий нет: сверьтесь с официальным расписанием.`,
       answerType: "schedule",
       sources: fallbackSources,
-      actions: [{ type: "day", label: "Открыть мой день" }],
+      actions: [
+        { type: "calendar", label: "Проверить неделю", startDate: studyDate },
+      ],
     };
   }
 
   const lines = entries.map((entry) => {
     const place = compact([entry.room, entry.building]).join(", ");
-    const time = entry.startTime && entry.endTime
-      ? `${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
-      : "Время уточняется";
+    const time =
+      entry.startTime && entry.endTime
+        ? `${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
+        : "Время уточняется";
     return `• ${time} — ${entry.subject}${place ? `, ${place}` : ""}${entry.teacherName ? ` · ${entry.teacherName}` : ""}`;
   });
 
@@ -43,14 +47,22 @@ export function formatScheduleResponse(entries, studyDate, fallbackSources = [])
     answer: `Расписание${entries.some((entry) => entry.source?.type === "snapshot") ? " по загруженному снимку" : ""} на ${formatStudyDate(studyDate)}:\n${lines.join("\n")}`,
     answerType: "schedule",
     sources: collectSources(entries),
-    actions: [{ type: "day", label: "Открыть весь день" }],
+    actions: [
+      {
+        type: "calendar",
+        label: "Открыть день в календаре",
+        startDate: studyDate,
+      },
+    ],
   };
 }
 
 export function formatTeacherResponse(teachers) {
   const lines = teachers.map((teacher) => {
     const details = compact([teacher.department, teacher.position]).join(" · ");
-    const subjects = teacher.subjects?.length ? `\n  Дисциплины: ${teacher.subjects.join(", ")}` : "";
+    const subjects = teacher.subjects?.length
+      ? `\n  Дисциплины: ${teacher.subjects.join(", ")}`
+      : "";
     return `• ${teacher.fullName}${details ? ` — ${details}` : ""}\n  ${teacher.email || "Email не указан в справочнике"}${subjects}`;
   });
   return {
@@ -66,7 +78,8 @@ export function formatTeacherResponse(teachers) {
 export function formatDeadlineResponse(deadlines, timeZone) {
   if (deadlines.length === 0) {
     return {
-      answer: "В подключённой базе пока нет подтверждённых сведений о дедлайнах вашей группы. Это не означает, что учебных сроков нет — проверьте LMS и сообщения преподавателя.",
+      answer:
+        "В подключённой базе пока нет подтверждённых сведений о дедлайнах вашей группы. Это не означает, что учебных сроков нет — проверьте LMS и сообщения преподавателя.",
       answerType: "deadline",
       sources: [],
       actions: [{ type: "day", label: "Открыть мой день" }],
@@ -89,7 +102,8 @@ export function formatDeadlineResponse(deadlines, timeZone) {
 export function formatLocationResponse(locations) {
   if (locations.length === 0) {
     return {
-      answer: "Я не нашёл подходящее место в справочнике кампуса. Уточните корпус, аудиторию или название подразделения.",
+      answer:
+        "Я не нашёл подходящее место в справочнике кампуса. Уточните корпус, аудиторию или название подразделения.",
       answerType: "location",
       sources: [],
       actions: [{ type: "campus", label: "Открыть справочник" }],
@@ -109,14 +123,15 @@ export function formatLocationResponse(locations) {
     answer: `Подходящие места:\n${lines.join("\n")}`,
     answerType: "location",
     sources: collectSources(locations),
-      actions: [{ type: "campus", label: "Открыть справочник кампуса" }],
+    actions: [{ type: "campus", label: "Открыть справочник кампуса" }],
   };
 }
 
 export function formatContactResponse(departments) {
   if (departments.length === 0) {
     return {
-      answer: "Подходящее подразделение в справочнике не найдено. Опишите вопрос чуть подробнее — например, справка, пропуск или доступ к сервису.",
+      answer:
+        "Подходящее подразделение в справочнике не найдено. Опишите вопрос чуть подробнее — например, справка, пропуск или доступ к сервису.",
       answerType: "contact",
       sources: [],
       actions: [{ type: "help", label: "Варианты обращений" }],

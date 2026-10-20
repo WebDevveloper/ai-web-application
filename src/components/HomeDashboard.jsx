@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useState } from "react";
 
 const suggestedQuestions = [
@@ -68,7 +69,7 @@ export default function HomeDashboard({
               aria-label="Отправить вопрос"
               disabled={!question.trim()}
             >
-              →
+              <Icon name="arrowRight" />
             </button>
           </div>
           <div className="suggestion-row">
@@ -98,9 +99,9 @@ export default function HomeDashboard({
             <button
               className="text-button"
               type="button"
-              onClick={() => onOpenDrawer("day")}
+              onClick={() => onOpenDrawer("calendar")}
             >
-              Весь день →
+              Вся неделя <Icon name="arrowRight" />
             </button>
           </div>
           {isLoading ? (
@@ -125,9 +126,9 @@ export default function HomeDashboard({
                   <button
                     type="button"
                     onClick={() => onOpenDrawer("campus")}
-                    aria-label="Показать маршрут"
+                    aria-label="Корпуса и аудитории"
                   >
-                    ↗
+                    <Icon name="pin" />
                   </button>
                 </div>
               ))}
@@ -171,7 +172,7 @@ export default function HomeDashboard({
                 <button
                   className="secondary-small"
                   type="button"
-                  onClick={() => onOpenDrawer("day")}
+                  onClick={() => onOpenDrawer("calendar")}
                 >
                   Все сроки
                 </button>
@@ -193,23 +194,27 @@ export default function HomeDashboard({
           </div>
           <div className="quick-links">
             <button type="button" onClick={() => onOpenDrawer("campus")}>
-              <i>◎</i>
+              <i>
+                <Icon name="pin" />
+              </i>
               <span>
                 <strong>Корпус или аудитория</strong>
                 <small>Адрес и транспорт</small>
               </span>
-              <b>→</b>
+              <Icon name="arrowRight" />
             </button>
             <button
               type="button"
               onClick={() => onAsk("Куда написать, если не работает LMS?")}
             >
-              <i>↗</i>
+              <i>
+                <Icon name="chat" />
+              </i>
               <span>
                 <strong>К кому обратиться</strong>
                 <small>Контакты поддержки</small>
               </span>
-              <b>→</b>
+              <Icon name="arrowRight" />
             </button>
             <button
               type="button"
@@ -217,12 +222,14 @@ export default function HomeDashboard({
                 onAsk("Как получить справку в социальные учреждения?")
               }
             >
-              <i>≡</i>
+              <i>
+                <Icon name="document" />
+              </i>
               <span>
                 <strong>Документы и справки</strong>
                 <small>Порядок получения</small>
               </span>
-              <b>→</b>
+              <Icon name="arrowRight" />
             </button>
           </div>
         </article>

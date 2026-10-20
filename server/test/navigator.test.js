@@ -328,10 +328,14 @@ test("миграция, импорт, SQL и API навигатора во вс�
         (await response.json()).results[0].fullName,
         "Зайцев Алексей",
       );
-      const scheduleResponse = await fetch(`${baseUrl}/api/schedule?groupCode=261-321&date=2026-10-19`);
+      const scheduleResponse = await fetch(
+        `${baseUrl}/api/schedule?groupCode=261-321&date=2026-10-19`,
+      );
       assert.equal(scheduleResponse.status, 200);
       assert.equal((await scheduleResponse.json()).lessons.length, 2);
-      const roomResponse = await fetch(`${baseUrl}/api/rooms?q=${encodeURIComponent("Д108")}`);
+      const roomResponse = await fetch(
+        `${baseUrl}/api/rooms?q=${encodeURIComponent("Д108")}`,
+      );
       assert.equal(roomResponse.status, 200);
       assert.equal((await roomResponse.json()).results[0].room, "Д108");
       assert.equal((await fetch(`${baseUrl}/api/health`)).status, 200);
@@ -356,7 +360,11 @@ test(
   async (context) => {
     const postgres = new PGlite({ extensions: { pgcrypto } });
     context.after(() => postgres.close());
-    for (const migration of ["001_initial_schema.sql", "002_navigator.sql"]) {
+    for (const migration of [
+      "001_initial_schema.sql",
+      "002_navigator.sql",
+      "003_accounts.sql",
+    ]) {
       await postgres.exec(
         await readFile(
           new URL(`../db/migrations/${migration}`, import.meta.url),
@@ -410,5 +418,15 @@ test(
     assert.ok(dashboard.locations.length > 0);
     assert.ok((await navigator.findTeachers("Зайцев")).length > 0);
     assert.ok((await campus.searchKnowledge("справка")).length > 0);
+    assert.equal((await campus.getGroups()).length, expectedCounts.dim_groups);
+    assert.ok(
+      (await campus.getGroups()).some((group) => group.code === "26А-111"),
+    );
+    const week = await campus.getScheduleWeek("261-321", "2026-10-19");
+    assert.equal(week.days.length, 7);
+    assert.deepEqual(
+      week.days[0].lessons,
+      await campus.getSchedule("261-321", "2026-10-19"),
+    );
   },
 );

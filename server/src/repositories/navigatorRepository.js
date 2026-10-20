@@ -152,5 +152,19 @@ export function createNavigatorRepository(database) {
     }));
   }
 
-  return { getStatus, getSchedule, findTeachers, findRooms, findLocations };
+  async function getGroups() {
+    await getSource();
+    const result = await database.query(
+      "SELECT group_name AS code, course FROM navigator.dim_groups ORDER BY group_name",
+    );
+    return result.rows;
+  }
+  return {
+    getStatus,
+    getSchedule,
+    findTeachers,
+    findRooms,
+    findLocations,
+    getGroups,
+  };
 }

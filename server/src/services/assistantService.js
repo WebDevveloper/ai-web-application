@@ -4,6 +4,7 @@ import {
   extractTeacherQuery,
   extractSearchTerms,
   resolveStudyDate,
+  resolveStudyWeek,
 } from "./intentClassifier.js";
 import {
   formatContactResponse,
@@ -28,17 +29,51 @@ export function createAssistantService({
 
       if (intent === "teacher") {
         const name = extractTeacherQuery(question);
-        if (!name) return {
-          answer: "Укажите фамилию, например: «Преподаватель Зайцев».",
-          answerType: "teacher", sources: [], actions: [{ type: "teachers", label: "Поиск преподавателя" }],
-        };
+        if (!name)
+          return {
+            answer: "Укажите фамилию, например: «Преподаватель Зайцев».",
+            answerType: "teacher",
+            sources: [],
+            actions: [{ type: "teachers", label: "Поиск преподавателя" }],
+          };
         const teachers = await campusRepository.findTeachers(name);
         return formatTeacherResponse(teachers);
       }
 
       if (intent === "schedule") {
+        const weekStart = resolveStudyWeek(question, new Date(), timeZone);
+        if (weekStart) {
+          const week = await campusRepository.getScheduleWeek(
+            groupCode,
+            weekStart,
+          );
+          const responses = week.days.map((day) =>
+            formatScheduleResponse(day.lessons, day.date),
+          );
+          return {
+            answer: `Неделя группы ${groupCode}:\n\n${responses.map((item) => item.answer).join("\n\n")}`,
+            answerType: "schedule",
+            sources: [
+              ...new Map(
+                responses
+                  .flatMap((item) => item.sources)
+                  .map((source) => [source.id, source]),
+              ).values(),
+            ],
+            actions: [
+              {
+                type: "calendar",
+                label: "Открыть календарь",
+                startDate: weekStart,
+              },
+            ],
+          };
+        }
         const studyDate = resolveStudyDate(question, new Date(), timeZone);
-        const entries = await campusRepository.getSchedule(groupCode, studyDate);
+        const entries = await campusRepository.getSchedule(
+          groupCode,
+          studyDate,
+        );
 
         if (entries.length > 0) {
           return formatScheduleResponse(entries, studyDate);

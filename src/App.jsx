@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { askAssistant } from "./api/chatApi";
-import { getDashboard } from "./api/campusApi";
+import { getDashboard, getGroups } from "./api/campusApi";
+import { apiRequest } from "./api/http";
+import AccountDialog from "./components/AccountDialog";
+import WeekCalendar from "./components/WeekCalendar";
+import Icon from "./components/Icon";
 import ChatComposer from "./components/ChatComposer";
 import ChatMessage from "./components/ChatMessage";
 import ContextDrawer from "./components/ContextDrawer";
@@ -41,9 +45,9 @@ function getChatTitle(text) {
   return `${cleanText.slice(0, 42)}…`;
 }
 
-function loadChats() {
+function loadChats(storageKey) {
   try {
-    const savedValue = localStorage.getItem(CHAT_STORAGE_KEY);
+    const savedValue = localStorage.getItem(storageKey);
 
     if (!savedValue) {
       const firstChat = createChat();
@@ -93,18 +97,127 @@ function getSourceStatus(isLoading, error, navigator) {
 }
 
 export default function App() {
-  const [initialChats] = useState(loadChats);
+  const [user, setUser] = useState(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [guestGroup, setGuestGroup] = useState(() => {
+    try {
+      return localStorage.getItem("campus-guest-group") || DEFAULT_GROUP_CODE;
+    } catch {
+      return DEFAULT_GROUP_CODE;
+    }
+  });
+  const [groups, setGroups] = useState([]);
+  const [groupsError, setGroupsError] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest("/auth/me")
+      .then((data) => {
+        if (!cancelled) setUser(data.user);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsSessionLoading(false);
+      });
+    getGroups()
+      .then((data) => {
+        if (!cancelled) setGroups(data.groups);
+      })
+      .catch((error) => {
+        if (!cancelled) setGroupsError(error.message);
+      });
+    function handleExpiredSession() {
+      setUser(null);
+      setSessionNotice(
+        "Сессия завершилась. Войдите снова, чтобы продолжить со своей группой.",
+      );
+    }
+    window.addEventListener("campus-session-expired", handleExpiredSession);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(
+        "campus-session-expired",
+        handleExpiredSession,
+      );
+    };
+  }, []);
+  const groupCode = user?.groupCode || guestGroup;
+  function changeGuestGroup(code) {
+    setGuestGroup(code);
+    try {
+      localStorage.setItem("campus-guest-group", code);
+    } catch {
+      /* Выбор останется в памяти до закрытия страницы. */
+    }
+  }
+  async function logout() {
+    try {
+      await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+      setUser(null);
+    } catch (error) {
+      setSessionNotice(error.message);
+    }
+  }
+  if (isSessionLoading)
+    return (
+      <div className="app-loading" role="status">
+        Открываем кампус…
+      </div>
+    );
+  return (
+    <>
+      {sessionNotice && (
+        <div className="session-notice" role="status">
+          {sessionNotice}
+          <button
+            className="icon-button"
+            aria-label="Скрыть уведомление"
+            onClick={() => setSessionNotice("")}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
+      <CampusApp
+        key={`${user?.id || "guest"}:${groupCode}`}
+        user={user}
+        groupCode={groupCode}
+        onOpenAccount={() => setIsAccountOpen(true)}
+        onLogout={logout}
+      />
+      {isAccountOpen && (
+        <AccountDialog
+          user={user}
+          groupCode={groupCode}
+          groups={groups}
+          groupsError={groupsError}
+          onAccountChange={(account) => {
+            setUser(account);
+            setSessionNotice("");
+          }}
+          onGuestGroupChange={changeGuestGroup}
+          onClose={() => setIsAccountOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function CampusApp({ user, groupCode, onOpenAccount, onLogout }) {
+  const storageKey = `${CHAT_STORAGE_KEY}:${user?.id || "guest"}:${groupCode}`;
+  const [initialChats] = useState(() => loadChats(storageKey));
   const [chats, setChats] = useState(initialChats.chats);
   const [activeChatId, setActiveChatId] = useState(initialChats.activeChatId);
   const [activeView, setActiveView] = useState("home");
   const [draft, setDraft] = useState("");
-  const [groupCode] = useState(DEFAULT_GROUP_CODE);
   const [dashboard, setDashboard] = useState(null);
   const [dashboardError, setDashboardError] = useState("");
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [isAnswerLoading, setIsAnswerLoading] = useState(false);
   const [chatError, setChatError] = useState("");
   const [drawerName, setDrawerName] = useState(null);
+  const [calendarDate, setCalendarDate] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const chatEndRef = useRef(null);
 
@@ -120,15 +233,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        CHAT_STORAGE_KEY,
-        JSON.stringify({ chats, activeChatId }),
-      );
+      localStorage.setItem(storageKey, JSON.stringify({ chats, activeChatId }));
     } catch {
       // В приватном режиме или при заполненном хранилище диалог остаётся в памяти.
       console.warn("Историю диалогов не удалось сохранить в браузере.");
     }
-  }, [chats, activeChatId]);
+  }, [chats, activeChatId, storageKey]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -178,6 +288,20 @@ export default function App() {
   function openView(viewName) {
     setActiveView(viewName);
     setIsMobileMenuOpen(false);
+  }
+
+  function openPanel(name, action = {}) {
+    setIsMobileMenuOpen(false);
+    if (name === "calendar") {
+      setCalendarDate(action.startDate || null);
+      openView("calendar");
+      setDrawerName(null);
+    } else setDrawerName(name);
+  }
+
+  function askFromPanel(question) {
+    setDrawerName(null);
+    sendMessage(question);
   }
 
   function startNewChat() {
@@ -269,6 +393,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar
+        user={user}
+        onOpenAccount={onOpenAccount}
+        onLogout={onLogout}
         activeView={activeView}
         activeChatId={activeChatId}
         chats={chats}
@@ -278,7 +405,7 @@ export default function App() {
         onCloseMobile={() => setIsMobileMenuOpen(false)}
         onDeleteChat={deleteChat}
         onNewChat={startNewChat}
-        onOpenDrawer={setDrawerName}
+        onOpenDrawer={openPanel}
         onSelectChat={selectChat}
         onViewChange={openView}
       />
@@ -286,6 +413,8 @@ export default function App() {
       <main className="workspace">
         <TopBar
           groupCode={groupCode}
+          user={user}
+          onOpenAccount={onOpenAccount}
           onMenuClick={() => setIsMobileMenuOpen(true)}
         />
 
@@ -296,7 +425,15 @@ export default function App() {
             groupCode={groupCode}
             isLoading={isDashboardLoading}
             onAsk={sendMessage}
-            onOpenDrawer={setDrawerName}
+            onOpenDrawer={openPanel}
+          />
+        ) : activeView === "calendar" ? (
+          <WeekCalendar
+            key={calendarDate || "current"}
+            initialDate={calendarDate}
+            groupCode={groupCode}
+            onAsk={sendMessage}
+            onOpenCampus={() => openPanel("campus")}
           />
         ) : (
           <section className="chat-view">
@@ -313,7 +450,7 @@ export default function App() {
                 type="button"
                 onClick={startNewChat}
               >
-                ＋ Новый диалог
+                <Icon name="plus" /> Новый диалог
               </button>
             </header>
 
@@ -326,7 +463,7 @@ export default function App() {
                     <ChatMessage
                       key={message.id}
                       message={message}
-                      onAction={(action) => setDrawerName(action.type)}
+                      onAction={(action) => openPanel(action.type, action)}
                     />
                   ))}
                   {isAnswerLoading && <LoadingBubble />}
@@ -349,6 +486,8 @@ export default function App() {
       <ContextDrawer
         dashboard={dashboard}
         name={drawerName}
+        onAsk={askFromPanel}
+        onOpenCalendar={() => openPanel("calendar")}
         onClose={() => setDrawerName(null)}
       />
     </div>

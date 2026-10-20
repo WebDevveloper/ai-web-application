@@ -1,4 +1,9 @@
+import Icon from "./Icon";
+
 export default function Sidebar({
+  user,
+  onOpenAccount,
+  onLogout,
   activeView,
   activeChatId,
   chats,
@@ -39,7 +44,7 @@ export default function Sidebar({
             type="button"
             onClick={() => onViewChange("home")}
           >
-            <span className="nav-symbol">⌂</span>
+            <Icon name="home" />
             <span>Главная</span>
           </button>
           <button
@@ -47,23 +52,23 @@ export default function Sidebar({
             type="button"
             onClick={() => onViewChange("chat")}
           >
-            <span className="nav-symbol">↗</span>
+            <Icon name="chat" />
             <span>Диалог</span>
           </button>
           <button
-            className="nav-item"
+            className={`nav-item ${activeView === "calendar" ? "active" : ""}`}
             type="button"
-            onClick={() => onOpenDrawer("day")}
+            onClick={() => onOpenDrawer("calendar")}
           >
-            <span className="nav-symbol">12</span>
-            <span>Мой день</span>
+            <Icon name="calendar" />
+            <span>Календарь</span>
           </button>
           <button
             className="nav-item"
             type="button"
             onClick={() => onOpenDrawer("campus")}
           >
-            <span className="nav-symbol">◎</span>
+            <Icon name="pin" />
             <span>Кампус</span>
           </button>
           <button
@@ -71,7 +76,7 @@ export default function Sidebar({
             type="button"
             onClick={() => onOpenDrawer("help")}
           >
-            <span className="nav-symbol">?</span>
+            <Icon name="book" />
             <span>Помощь</span>
           </button>
           <button
@@ -79,7 +84,7 @@ export default function Sidebar({
             type="button"
             onClick={() => onOpenDrawer("teachers")}
           >
-            <span className="nav-symbol">П</span>
+            <Icon name="teacher" />
             <span>Преподаватели</span>
           </button>
         </nav>
@@ -88,7 +93,7 @@ export default function Sidebar({
           <div className="recent-chats-head">
             <small>ПОСЛЕДНИЕ ДИАЛОГИ</small>
             <button type="button" onClick={onNewChat} aria-label="Новый диалог">
-              ＋
+              <Icon name="plus" />
             </button>
           </div>
           {chats.slice(0, 3).map((chat) => (
@@ -106,7 +111,7 @@ export default function Sidebar({
                   onClick={() => onDeleteChat(chat.id)}
                   aria-label={`Удалить диалог ${chat.title}`}
                 >
-                  ×
+                  <Icon name="close" />
                 </button>
               )}
             </div>
@@ -121,13 +126,23 @@ export default function Sidebar({
           </div>
         </div>
 
-        <div className="profile">
-          <span className="avatar">С</span>
-          <span>
-            <strong>Студент</strong>
-            <small>{groupCode} · 1 курс</small>
+        <button className="profile" type="button" onClick={onOpenAccount}>
+          <span className="avatar">
+            {user?.displayName?.[0]?.toUpperCase() || "С"}
           </span>
-        </div>
+          <span>
+            <strong>{user?.displayName || "Гостевой профиль"}</strong>
+            <small>
+              {groupCode} · {user ? "Моя группа" : "Выбрать группу / войти"}
+            </small>
+          </span>
+        </button>
+        {user && (
+          <button className="logout-button" onClick={onLogout}>
+            <Icon name="logout" />
+            Выйти
+          </button>
+        )}
       </aside>
     </>
   );

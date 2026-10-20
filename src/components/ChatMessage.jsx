@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useState } from "react";
 import { sendFeedback } from "../api/campusApi";
 
@@ -95,7 +96,7 @@ export default function ChatMessage({ message, onAction }) {
                   type="button"
                   onClick={() => onAction(action)}
                 >
-                  {action.label} →
+                  {action.label} <Icon name="arrowRight" />
                 </button>
               ))}
             </div>
@@ -118,7 +119,7 @@ export default function ChatMessage({ message, onAction }) {
                 disabled={feedbackState === "saving"}
                 aria-label="Ответ помог"
               >
-                ＋
+                <Icon name="thumbsUp" />
               </button>
               <button
                 type="button"
@@ -126,7 +127,7 @@ export default function ChatMessage({ message, onAction }) {
                 disabled={feedbackState === "saving"}
                 aria-label="Ответ не помог"
               >
-                −
+                <Icon name="thumbsDown" />
               </button>
             </>
           )}

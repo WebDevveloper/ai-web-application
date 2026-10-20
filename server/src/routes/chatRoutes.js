@@ -10,10 +10,12 @@ export function createChatRouter({ assistantService, config }) {
 
   router.post("/chat", async (request, response) => {
     const messages = normalizeMessages(request.body);
-    const groupCode = normalizeGroupCode(
-      request.body?.context?.groupCode,
-      config.defaultGroupCode,
-    );
+    const groupCode =
+      request.user?.groupCode ||
+      normalizeGroupCode(
+        request.body?.context?.groupCode,
+        config.defaultGroupCode,
+      );
 
     if (messages.length === 0 || messages.at(-1)?.role !== "user") {
       response.status(400).json({ error: "Добавьте вопрос пользователя." });
@@ -21,7 +23,9 @@ export function createChatRouter({ assistantService, config }) {
     }
 
     if (!groupCode) {
-      response.status(400).json({ error: "Некорректный номер учебной группы." });
+      response
+        .status(400)
+        .json({ error: "Некорректный номер учебной группы." });
       return;
     }
 
@@ -31,7 +35,8 @@ export function createChatRouter({ assistantService, config }) {
     } catch (error) {
       if (error.code === "AI_NOT_CONFIGURED") {
         response.status(503).json({
-          error: "ИИ-модель ещё не настроена. Укажите OPENAI_API_KEY на сервере.",
+          error:
+            "ИИ-модель ещё не настроена. Укажите OPENAI_API_KEY на сервере.",
         });
         return;
       }

@@ -25,11 +25,20 @@ export const config = {
   environment: process.env.NODE_ENV || "development",
   host: process.env.HOST || "0.0.0.0",
   port: Number(process.env.PORT) || 3000,
+  trustProxy: Number(process.env.TRUST_PROXY_HOPS) || false,
   clientOrigins,
   defaultGroupCode: process.env.DEFAULT_GROUP_CODE || "261-321",
   campusTimeZone: process.env.CAMPUS_TIME_ZONE || "Europe/Moscow",
   assistantMode: process.env.ASSISTANT_MODE || "verified-data",
   navigatorEnabled: parseBoolean(process.env.NAVIGATOR_ENABLED),
+  auth: {
+    secret: process.env.JWT_SECRET || "",
+    cookieSecure: parseBoolean(
+      process.env.COOKIE_SECURE,
+      process.env.NODE_ENV === "production",
+    ),
+    cookieSameSite: process.env.COOKIE_SAME_SITE || "lax",
+  },
   database: {
     connectionString: process.env.DATABASE_URL || "",
     useSsl: parseBoolean(process.env.DATABASE_SSL),
@@ -42,3 +51,15 @@ export const config = {
     reasoningEffort: process.env.OPENAI_REASONING_EFFORT || "none",
   },
 };
+
+if (
+  !["lax", "strict", "none"].includes(config.auth.cookieSameSite) ||
+  (config.auth.cookieSameSite === "none" && !config.auth.cookieSecure)
+) {
+  throw new Error(
+    "COOKIE_SAME_SITE должен быть lax/strict/none; none требует COOKIE_SECURE=true.",
+  );
+}
+if (config.environment === "production" && !config.auth.cookieSecure) {
+  throw new Error("В production требуется COOKIE_SECURE=true и HTTPS.");
+}

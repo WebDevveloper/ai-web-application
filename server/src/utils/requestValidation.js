@@ -1,9 +1,11 @@
-const GROUP_CODE_PATTERN = /^\d{3}-\d{3,4}$/;
+// В официальном справочнике есть и буквенные номера, например 26А-111.
+const GROUP_CODE_PATTERN = /^[\dA-ZА-ЯЁ]{3}-\d{3,4}$/u;
 const ALLOWED_ROLES = new Set(["user", "assistant"]);
 const ALLOWED_RATINGS = new Set(["helpful", "not_helpful"]);
 
 export function normalizeGroupCode(value, fallback = "") {
-  const groupCode = typeof value === "string" ? value.trim() : fallback;
+  const groupCode =
+    typeof value === "string" ? value.trim().toUpperCase() : fallback;
   return GROUP_CODE_PATTERN.test(groupCode) ? groupCode : "";
 }
 
@@ -29,7 +31,8 @@ export function normalizeMessages(body) {
 }
 
 export function normalizeFeedback(body) {
-  const messageId = typeof body?.messageId === "string" ? body.messageId.trim() : "";
+  const messageId =
+    typeof body?.messageId === "string" ? body.messageId.trim() : "";
   const rating = typeof body?.rating === "string" ? body.rating : "";
 
   if (!messageId || messageId.length > 100 || !ALLOWED_RATINGS.has(rating)) {

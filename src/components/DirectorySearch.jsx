@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { searchDirectory } from "../api/campusApi";
+import Icon from "./Icon";
 
-export default function DirectorySearch({ kind }) {
+export default function DirectorySearch({ kind, onSelectLocation }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
@@ -76,6 +77,15 @@ export default function DirectorySearch({ kind }) {
                 <span>
                   {[item.address, item.transport].filter(Boolean).join(" · ")}
                 </span>
+                {item.address && onSelectLocation && (
+                  <button
+                    className="secondary-button"
+                    onClick={() => onSelectLocation(item)}
+                  >
+                    <Icon name="pin" />
+                    Показать корпус на карте
+                  </button>
+                )}
               </>
             )}
           </div>

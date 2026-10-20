@@ -1,4 +1,5 @@
-import { getIsoDate } from "../utils/dateTime.js";
+import { addDays, getIsoDate, isIsoDate } from "../utils/dateTime.js";
+import { normalizeGroupCode } from "../utils/requestValidation.js";
 
 function buildSearchPatterns(terms) {
   return terms.map((term) => `%${term.toLocaleLowerCase("ru-RU")}%`);
@@ -22,7 +23,8 @@ export function createCampusRepository(
   { timeZone = "Europe/Moscow", navigatorRepository = null } = {},
 ) {
   async function getSchedule(groupCode, studyDate) {
-    if (navigatorRepository) return navigatorRepository.getSchedule(groupCode, studyDate);
+    if (navigatorRepository)
+      return navigatorRepository.getSchedule(groupCode, studyDate);
     const result = await database.query(
       `SELECT
          schedule.id,
@@ -61,7 +63,12 @@ export function createCampusRepository(
     }));
   }
 
-  async function getDeadlines(groupCode, limit = 6) {
+  async function getDeadlines(
+    groupCode,
+    limit = 6,
+    startDate = null,
+    endDate = null,
+  ) {
     const result = await database.query(
       `SELECT
          deadline.id,
@@ -77,11 +84,12 @@ export function createCampusRepository(
        LEFT JOIN study_groups AS study_group ON study_group.id = deadline.group_id
        LEFT JOIN knowledge_sources AS source ON source.id = deadline.source_id
        WHERE deadline.status = 'active'
-         AND deadline.due_at >= NOW()
+         AND deadline.due_at >= COALESCE($3::date AT TIME ZONE $5, NOW())
+         AND ($4::date IS NULL OR deadline.due_at < ($4::date + 1) AT TIME ZONE $5)
          AND (study_group.code = $1 OR deadline.group_id IS NULL)
        ORDER BY deadline.due_at
        LIMIT $2`,
-      [groupCode, limit],
+      [groupCode, limit, startDate, endDate, timeZone],
     );
 
     return result.rows.map((row) => ({
@@ -95,7 +103,8 @@ export function createCampusRepository(
   }
 
   async function findLocations(terms = [], limit = 6) {
-    if (navigatorRepository) return navigatorRepository.findLocations(terms, limit);
+    if (navigatorRepository)
+      return navigatorRepository.findLocations(terms, limit);
     const patterns = buildSearchPatterns(terms);
     const result = await database.query(
       `SELECT
@@ -210,23 +219,83 @@ export function createCampusRepository(
 
   return {
     ping: database.ping,
+    async getGroups() {
+      if (navigatorRepository) return navigatorRepository.getGroups();
+      const result = await database.query(
+        "SELECT code, academic_year AS course FROM study_groups ORDER BY code",
+      );
+      return result.rows;
+    },
+    async ensureStudyGroup(groupCode) {
+      if (
+        !normalizeGroupCode(groupCode) ||
+        normalizeGroupCode(groupCode) !== groupCode
+      )
+        return false;
+      if (navigatorRepository) {
+        // Копируем только выбранный код в постоянный справочник профилей.
+        const result = await database.query(
+          `INSERT INTO study_groups(code) SELECT group_name FROM navigator.dim_groups WHERE group_name = $1
+           ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id`,
+          [groupCode],
+        );
+        return result.rows.length === 1;
+      }
+      const result = await database.query(
+        "SELECT id FROM study_groups WHERE code = $1",
+        [groupCode],
+      );
+      return result.rows.length === 1;
+    },
+    async getScheduleWeek(groupCode, startDate) {
+      if (!isIsoDate(startDate))
+        throw Object.assign(new Error("Некорректная дата недели."), {
+          code: "INVALID_INPUT",
+        });
+      const dates = Array.from({ length: 7 }, (_, index) =>
+        addDays(startDate, index),
+      );
+      // Диапазон ограничен семью днями: API не позволяет выгрузить произвольный объём.
+      const days = await Promise.all(
+        dates.map(async (date) => ({
+          date,
+          lessons: await getSchedule(groupCode, date),
+        })),
+      );
+      return {
+        groupCode,
+        startDate,
+        endDate: dates.at(-1),
+        days,
+        deadlines: await getDeadlines(groupCode, 500, startDate, dates.at(-1)),
+      };
+    },
     getSchedule,
     getDeadlines,
     findLocations,
     findDepartments,
     searchKnowledge,
-    findTeachers: (query) => navigatorRepository ? navigatorRepository.findTeachers(query) : Promise.resolve([]),
-    findRooms: (query) => navigatorRepository ? navigatorRepository.findRooms(query) : Promise.resolve([]),
-    getNavigatorStatus: () => navigatorRepository
-      ? navigatorRepository.getStatus()
-      : Promise.resolve({ enabled: false, importedAt: null }),
+    findTeachers: (query) =>
+      navigatorRepository
+        ? navigatorRepository.findTeachers(query)
+        : Promise.resolve([]),
+    findRooms: (query) =>
+      navigatorRepository
+        ? navigatorRepository.findRooms(query)
+        : Promise.resolve([]),
+    getNavigatorStatus: () =>
+      navigatorRepository
+        ? navigatorRepository.getStatus()
+        : Promise.resolve({ enabled: false, importedAt: null }),
     async getDashboard(groupCode) {
       const today = getIsoDate(new Date(), timeZone);
       const [lessons, deadlines, locations, navigator] = await Promise.all([
         getSchedule(groupCode, today),
         getDeadlines(groupCode, 4),
-        findLocations([], 4),
-        navigatorRepository ? navigatorRepository.getStatus() : { enabled: false, importedAt: null },
+        findLocations([], 20),
+        navigatorRepository
+          ? navigatorRepository.getStatus()
+          : { enabled: false, importedAt: null },
       ]);
 
       return {

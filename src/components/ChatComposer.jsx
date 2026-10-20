@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect, useRef } from "react";
 
 export default function ChatComposer({ value, onChange, onSubmit, isLoading }) {
@@ -24,8 +25,13 @@ export default function ChatComposer({ value, onChange, onSubmit, isLoading }) {
   return (
     <div className="chat-composer-wrap">
       <div className="chat-composer">
-        <button className="attach-button" type="button" aria-label="Прикрепить файл" disabled>
-          ＋
+        <button
+          className="attach-button"
+          type="button"
+          aria-label="Прикрепить файл"
+          disabled
+        >
+          <Icon name="plus" />
         </button>
         <textarea
           ref={textareaRef}
@@ -43,11 +49,12 @@ export default function ChatComposer({ value, onChange, onSubmit, isLoading }) {
           disabled={isLoading || !value.trim()}
           aria-label="Отправить сообщение"
         >
-          →
+          <Icon name="arrowRight" />
         </button>
       </div>
       <p className="composer-note">
-        Ответы основаны на подключённых источниках. Важные решения лучше подтвердить у ответственного подразделения.
+        Ответы основаны на подключённых источниках. Важные решения лучше
+        подтвердить у ответственного подразделения.
       </p>
     </div>
   );
